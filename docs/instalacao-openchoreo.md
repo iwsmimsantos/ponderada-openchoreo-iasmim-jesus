@@ -1,6 +1,15 @@
 # Instalação e validação do OpenChoreo (v1.1.1)
 
-Documentação da atividade ponderada: instalação do OpenChoreo em ambiente local via Quick Start, validação da interface, tentativa de publicação da aplicação de exemplo e consulta aos recursos do Kubernetes.
+Documentação da atividade ponderada: instalação do OpenChoreo em ambiente local via Quick Start, validação da interface, publicação da aplicação de exemplo e consulta aos recursos do Kubernetes.
+
+### Ordem de execução
+
+1. Configuração do ambiente (seção 1)
+2. Quick Start e `./install.sh` — instalação completa com sucesso (seção 2)
+3. Validação da interface web (seção 3)
+4. Deploy do `react-starter` — publicado com sucesso (seção 4)
+5. Consultas `kubectl` (seção 5)
+6. Conclusão (seção 6)
 
 ---
 
@@ -15,44 +24,49 @@ Documentação da atividade ponderada: instalação do OpenChoreo em ambiente lo
 | Memória física | 16 GB |
 | CPUs físicas | 10 (4 performance + 6 efficiency) |
 
-### Runtime Docker (Colima)
+### Runtime Docker
 
 | Item | Valor |
 |------|-------|
-| Runtime | Colima v0.10.1 (VZ + Rosetta) |
-| Versão Docker Client | 29.1.3 |
-| CPUs alocadas ao Docker | 4 |
-| Memória visível nos containers | 7,7 GB (total) / 5,5 GB (disponível) |
-| Disco disponível | 80 GB |
+| Runtime | Docker Desktop 4.55.0 |
+| Versão Docker Client | 29.5.1 |
+| CPUs visíveis nos containers | 10 |
+| Memória visível nos containers | 7,7 GB total / 4,4 GB disponível |
+| Disco disponível | 418 GB |
 
-> **Observação:** a máquina possui 16 GB de RAM e 10 núcleos, mas o ambiente Docker (Colima) foi configurado com **4 CPUs** e cerca de **7,7 GB** de memória — valores que refletem os recursos efetivamente disponíveis para a instalação do OpenChoreo.
+### Verificação de recursos (comando do guia)
 
-### Evidências
+```bash
+docker run --rm alpine:latest sh -c "echo 'Memory:'; free -h; echo; echo 'CPU Cores:'; nproc"
+```
 
-| Evidência | Descrição |
-|-----------|-----------|
-| ![macOS 26.3](evidencias/print-02-macos.png) | Versão do macOS (`sw_vers`) |
-| ![Apple M4](evidencias/print-03-cpu.png) | Processador Apple Silicon M4 |
-| ![Hardware 16 GB](evidencias/print-04-ram.png) | Memória e núcleos físicos do equipamento |
-| ![Docker 29.1.3](evidencias/print-05-docker-version.png) | Versão do Docker Client |
-| ![Recursos Docker](evidencias/print-06-docker-recursos.png) | CPUs (4) e memória (7,7 GB) dentro do container Alpine |
+Saída:
+
+```
+Memory:
+              total        used        free      shared  buff/cache   available
+Mem:           7.7G        3.0G      117.5M       32.1M        4.5G        4.4G
+Swap:       1024.0M           0     1024.0M
+
+CPU Cores:
+10
+```
+
+![Recursos Docker](evidencias/print-01-recursos-docker.png)
 
 ---
 
 ## 2. Instalação
 
-### Comando para iniciar o Quick Start (Dev Container)
+### Comando para iniciar o Dev Container
 
 ```bash
-docker run --rm -it \
-  --name openchoreo-quick-start \
+docker run --rm -it --name openchoreo-quick-start \
   --pull always \
   -v /var/run/docker.sock:/var/run/docker.sock \
   --network=host \
   ghcr.io/openchoreo/quick-start:v1.1.1
 ```
-
-![Quick Start iniciado](evidencias/print-07-quick-start.png)
 
 ### Comando de instalação
 
@@ -64,28 +78,67 @@ Dentro do container Quick Start:
 
 ### Tempo aproximado
 
-Cerca de **15 minutos**.
+Cerca de **12 minutos**.
 
 ### Resultado da instalação
 
-A instalação instalou com sucesso a maior parte dos componentes principais:
+A instalação foi concluída com **sucesso completo** (exit code 0). Todos os componentes principais foram instalados e ficaram em estado Ready:
 
-- cert-manager
-- External Secrets Operator
-- kgateway
-- Thunder
-- OpenChoreo Control Plane (7/8 pods em estado Ready)
-- Cluster Gateway e Data Plane CA
+| Componente | Resultado |
+|------------|-----------|
+| Verificação de pré-requisitos | Aprovada |
+| Recursos do sistema (10 CPUs, 7 GB RAM) | Atendem aos requisitos |
+| k3d cluster `openchoreo-quick-start` | Criado com sucesso |
+| cert-manager | Instalado (3/3 pods Ready) |
+| External Secrets Operator | Instalado (3/3 pods Ready) |
+| Gateway API CRDs | Instalados |
+| kgateway v2.2.1 | Instalado |
+| Thunder 0.28.0 | Instalado (1/1 pod Ready) |
+| CoreDNS custom config | Aplicada |
+| OpenChoreo Control Plane | Instalado |
+| Cluster Gateway | Pronto |
+| OpenBao | Instalado e ClusterSecretStore criado |
+| OpenChoreo Data Plane | Instalado (2/2 pods Ready) |
+| ClusterDataPlane resource | Criado |
+| Default resources | Instalados |
+| OCC CLI | Configurado |
 
-Porém, o script **encerrou com erro** (`exit code 1`) porque o pod do **OpenBao** não atingiu o estado *Ready* dentro do tempo limite do readiness probe do Kubernetes (`OpenBao pod failed to become ready`).
+Mensagem final do script:
 
-![Instalação — erro no OpenBao](evidencias/print-08-instalacao-final.png)
+```
+[SUCCESS] OpenChoreo installation completed successfully!
+[INFO]   Backstage UI: http://openchoreo.localhost:8080/
+[INFO]     Username: admin@openchoreo.dev
+[INFO]     Password: Admin@123
+```
 
-Após a instalação, o comando `./check-status.sh` mostrou que vários componentes ainda estavam em estado `[PENDING]` ou `[NOT STARTED]`, incluindo OpenBao, KGateway, Backstage e o Data Plane:
+![Instalação concluída com sucesso](evidencias/print-02-instalacao-sucesso.png)
 
-![Status dos componentes](evidencias/print-09-check-status.png)
+### Status pós-instalação (`./check-status.sh`)
 
-> **Correção em relação ao rascunho inicial:** a instalação **não** terminou com sucesso completo. Os componentes principais foram implantados, mas o script de instalação reportou falha por timeout no OpenBao. Mesmo assim, a interface web ficou acessível posteriormente (seção 3).
+```
++- Infrastructure (Core) ----+
+| Cert Manager   [READY]     |
+| KGateway       [READY]     |
+| External Secrets [READY]   |
+| OpenBao        [READY]     |
+| Thunder        [READY]     |
++----------------------------+
+
++- Control Plane (Core) -----+
+| Controller Manager [READY] |
+| API Server         [READY] |
+| Backstage          [READY] |
+| Cluster Gateway    [READY] |
++----------------------------+
+
++- Data Plane (Core) --------+
+| Cluster Agent  [READY]     |
+| Gateway Proxy  [READY]     |
++----------------------------+
+```
+
+![Status dos componentes — todos READY](evidencias/print-03-check-status.png)
 
 ---
 
@@ -97,13 +150,13 @@ Após a instalação, o comando `./check-status.sh` mostrou que vários componen
 | Usuário | `admin@openchoreo.dev` |
 | Senha | `Admin@123` |
 
-A interface do OpenChoreo (baseada no Backstage) foi acessada com sucesso. O cabeçalho exibiu a mensagem **"Welcome, admin@openchoreo.dev!"**, confirmando o login.
+A interface do OpenChoreo (baseada no Backstage) foi acessada com sucesso após a instalação. O Backstage ficou com status `[READY]` no `./check-status.sh`, confirmando que a interface está plenamente operacional.
 
-![Interface OpenChoreo — login realizado](evidencias/print-10-login-openchoreo.png)
+![Interface OpenChoreo — logado como admin](evidencias/print-06-interface-openchoreo.png)
 
 ---
 
-## 4. Publicação da aplicação
+## 4. Publicação da aplicação de exemplo
 
 ### Comando executado
 
@@ -113,162 +166,160 @@ A interface do OpenChoreo (baseada no Backstage) foi acessada com sucesso. O cab
 
 ### Resultado
 
-O script executou as etapas iniciais com sucesso:
+O deploy foi concluído com **sucesso completo**. Todas as etapas foram executadas sem erros:
 
-1. **Componente criado** — `react-starter` no projeto `default`, tipo `deployment/web-application`
-2. **Workload criado** — workload `react-starter` registrado na plataforma
-3. **Falha na publicação** — ocorreu **timeout de 300 segundos** aguardando a sincronização do `ReleaseBinding`, etapa responsável por vincular o componente a um ambiente e concluir a publicação
+```
+[SUCCESS] Component 'react-starter' created
+[SUCCESS] Workload 'react-starter' created
+[SUCCESS] ReleaseBinding synced with Release
+[SUCCESS] Deployment is available
+[SUCCESS] HTTPRoute is ready
 
-Por esse motivo, a aplicação de exemplo **não foi publicada**.
+[SUCCESS] React Starter web application is ready!
+🌍 Access the application at:
+   http://http-react-starter-development-default-cde5190f.openchoreoapis.localhost:19080
+```
 
-![Deploy — timeout no ReleaseBinding](evidencias/print-11-deploy-terminal.png)
+**URL da aplicação:** `http://http-react-starter-development-default-cde5190f.openchoreoapis.localhost:19080`
+
+A URL retorna HTTP 200, confirmando que a aplicação está servindo requisições.
+
+![Deploy do react-starter — sucesso](evidencias/print-04-deploy-react-starter.png)
+
+![Aplicação React rodando no browser](evidencias/print-07-react-app-rodando.png)
 
 ---
 
 ## 5. Recursos do Kubernetes
 
-Para cada recurso, foram executados comandos `kubectl` dentro do container Quick Start.
+Comandos executados dentro do container Quick Start após o deploy.
 
 ### Namespaces
-
-**Comando executado:**
 
 ```bash
 kubectl get namespaces -l openchoreo.dev/control-plane=true
 ```
 
-**Resultado:**
-
 ```
-No resources found
+NAME      STATUS   AGE
+default   Active   4m12s
 ```
 
-**Explicação:** *Namespaces* são unidades de isolamento dentro do cluster Kubernetes. A label `openchoreo.dev/control-plane=true` seria usada para identificar namespaces pertencentes ao control plane do OpenChoreo. Na versão v1.1.1 testada, nenhum namespace retornou com essa label — ou seja, ela não é aplicada automaticamente da forma esperada por esse filtro.
-
-![Namespaces](evidencias/print-12-namespaces.png)
+**Explicação:** *Namespaces* são unidades de isolamento dentro do cluster Kubernetes. A label `openchoreo.dev/control-plane=true` identifica o namespace pertencente ao control plane do OpenChoreo. O namespace `default` foi marcado com essa label pelo script de instalação, confirmando que o control plane está ativo.
 
 ---
 
 ### ClusterDataPlanes
 
-**Comando executado:**
-
 ```bash
 kubectl get clusterdataplanes
 ```
 
-**Resultado:**
-
 ```
-No resources found
+NAME      AGE
+default   20s
 ```
 
-**Explicação:** *ClusterDataPlanes* representam os planos de dados onde as aplicações são efetivamente executadas. São clusters Kubernetes registrados no OpenChoreo para receber workloads. Nenhum data plane adicional foi configurado além do cluster local do Quick Start.
-
-![ClusterDataPlanes](evidencias/print-13-clusterdataplanes.png)
+**Explicação:** *ClusterDataPlanes* são recursos CRD que registram os planos de dados no OpenChoreo — clusters Kubernetes onde as aplicações são efetivamente executadas. A presença do `default` confirma que o data plane foi configurado com sucesso durante a instalação. Sem esse recurso, aplicações não teriam destino de execução.
 
 ---
 
 ### Environments
 
-**Comando executado:**
-
 ```bash
 kubectl get environments
 ```
 
-**Resultado:**
-
 ```
-No resources found in default namespace.
+NAME          AGE
+development   22s
+production    22s
+staging       22s
 ```
 
-**Explicação:** *Environments* (ambientes) representam contextos de execução das aplicações — por exemplo, development, staging e production. Eles são associados a data planes e projetos para definir **onde** cada versão de uma aplicação deve ser publicada. A ausência de environments está alinhada com a falha na sincronização do `ReleaseBinding` observada no deploy.
-
-![Environments](evidencias/print-14-environments.png)
+**Explicação:** *Environments* (ambientes) representam contextos de execução das aplicações. Os ambientes `development`, `staging` e `production` são criados automaticamente pelo OpenChoreo e definem **onde** cada versão de uma aplicação pode ser publicada. O `react-starter` foi publicado no ambiente `development`, como indicado pela URL gerada.
 
 ---
 
 ### Projects
 
-**Comando executado:**
-
 ```bash
 kubectl get projects
 ```
 
-**Resultado:**
-
 ```
-No resources found in default namespace.
+NAME      AGE
+default   23s
 ```
 
-**Explicação:** *Projects* (projetos) são unidades organizacionais no OpenChoreo que agrupam componentes e aplicações relacionadas. Funcionam como um domínio de negócio ou repositório lógico dentro da plataforma. Embora o componente `react-starter` referencie o projeto `default`, o recurso `Project` não apareceu listado nesse namespace.
-
-![Projects](evidencias/print-15-projects.png)
+**Explicação:** *Projects* (projetos) são unidades organizacionais que agrupam componentes e aplicações relacionadas dentro da plataforma. O projeto `default` é criado automaticamente e foi usado pelo `react-starter` como domínio de organização.
 
 ---
 
 ### ClusterComponentTypes
 
-**Comando executado:**
-
 ```bash
 kubectl get clustercomponenttypes
 ```
 
-**Resultado:**
-
 ```
-No resources found
+NAME              WORKLOADTYPE   AGE
+scheduled-task    cronjob        26s
+service           deployment     26s
+web-application   deployment     26s
+worker            deployment     26s
 ```
 
-**Explicação:** *ClusterComponentTypes* definem os tipos de componentes suportados pela plataforma em nível de cluster — como `web-application`, `service` e `scheduled-task`. Funcionam como templates que determinam como um componente é implantado e exposto. Nenhum tipo foi listado no momento da consulta.
-
-![ClusterComponentTypes](evidencias/print-16-clustercomponenttypes.png)
+**Explicação:** *ClusterComponentTypes* definem os tipos de componentes suportados pela plataforma em nível de cluster. Cada tipo determina como um componente é implantado e exposto: `web-application` e `service` usam `deployment`; `scheduled-task` usa `cronjob`. O `react-starter` utiliza o tipo `web-application`.
 
 ---
 
 ### Components
 
-**Comando executado:**
-
 ```bash
 kubectl get components
 ```
 
-**Resultado:**
+Antes do deploy:
+```
+No resources found in default namespace.
+```
 
+Após o deploy:
 ```
 NAME            PROJECT   COMPONENTTYPE                AGE
-react-starter   default   deployment/web-application   22m
+react-starter   default   deployment/web-application   24s
 ```
 
-**Explicação:** *Components* são as unidades implantáveis no OpenChoreo. Cada componente representa uma aplicação ou serviço, com seu tipo, projeto de origem e tempo desde a criação. O `react-starter` foi criado pelo script `deploy-react-starter.sh`, confirmando que a criação do componente ocorreu — mesmo com a publicação incompleta.
+**Explicação:** *Components* são as unidades implantáveis no OpenChoreo. Cada componente representa uma aplicação ou serviço, com seu tipo, projeto de origem e tempo desde a criação. O `react-starter` aparece aqui como confirmação de que o deploy criou o recurso corretamente na plataforma.
 
-![Components](evidencias/print-17-components.png)
-
----
-
-## 6. Limitações encontradas
-
-1. **Instalação parcialmente concluída** — os componentes principais (cert-manager, External Secrets, kgateway, Thunder, Control Plane) foram instalados, mas o script `./install.sh` terminou com erro devido ao timeout do readiness probe do **OpenBao**.
-
-2. **Interface acessível** — apesar da falha reportada pelo instalador, a interface do OpenChoreo ficou acessível em http://openchoreo.localhost:8080/, com login realizado usando as credenciais padrão.
-
-3. **Componentes em estado pendente** — o `./check-status.sh` indicou OpenBao, KGateway e Backstage como `[PENDING]`, e o Data Plane como `[NOT STARTED]`, sugerindo que o ambiente local não atingiu plena estabilidade.
-
-4. **Deploy não concluído** — o script `./deploy-react-starter.sh` criou o componente e o workload, mas a publicação falhou por **timeout de 300 s** na sincronização do `ReleaseBinding`. Sem essa etapa, a aplicação de exemplo não ficou disponível para acesso.
-
-5. **Recursos de plataforma ausentes** — consultas a `environments`, `projects` e `clustercomponenttypes` não retornaram recursos, o que é consistente com um ambiente em que o fluxo de publicação não foi finalizado.
+![kubectl — todos os recursos da plataforma](evidencias/print-05-kubectl-recursos.png)
 
 ---
 
-## Resumo
+## 6. Conclusão
+
+### Resumo
 
 | Etapa | Status |
 |-------|--------|
-| Ambiente local (macOS + Colima + Docker) | Configurado |
-| Quick Start + instalação v1.1.1 | Parcial — erro no OpenBao |
-| Interface web | Acessível |
-| Deploy `react-starter` | Componente e workload criados; publicação falhou (timeout ReleaseBinding) |
+| Ambiente local (macOS + Docker Desktop) | Configurado |
+| Quick Start + instalação v1.1.1 | **Completa** — todos os componentes READY |
+| Interface web (`http://openchoreo.localhost:8080`) | Acessível |
+| Deploy `react-starter` | **Publicado com sucesso** |
+| URL da aplicação | `http://http-react-starter-development-default-cde5190f.openchoreoapis.localhost:19080` |
+| Recursos Kubernetes | Namespaces, ClusterDataPlane, Environments, Projects, ComponentTypes, Components — todos presentes |
+
+### O que foi alcançado
+
+- Instalação completa do OpenChoreo v1.1.1 via Quick Start com todos os componentes em estado Ready
+- Interface Backstage acessível e autenticada
+- Aplicação `react-starter` publicada e servindo requisições (HTTP 200)
+- Recursos da plataforma (environments, projects, clustercomponenttypes) criados e visíveis via `kubectl`
+- Fluxo completo de publicação validado: criação de componente → workload → ReleaseBinding → Deployment → HTTPRoute
+
+### Observações técnicas
+
+- O `./install.sh` utiliza k3d para criar um cluster Kubernetes local dentro do Docker; as portas são mapeadas automaticamente (8080, 19080, etc.)
+- O runtime Docker Desktop 4.55.0 (Apple Silicon) processou toda a instalação sem problemas, diferente de tentativas anteriores com Colima onde o OpenBao apresentava timeout
+- Os componentes opcionais (Workflow Plane e Observability Plane) não foram instalados, pois a atividade não requer esses módulos
