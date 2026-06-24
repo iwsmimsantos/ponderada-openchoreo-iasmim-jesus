@@ -68,6 +68,10 @@ docker run --rm -it --name openchoreo-quick-start \
   ghcr.io/openchoreo/quick-start:v1.1.1
 ```
 
+### Quick Start em execução
+
+![Container openchoreo-quick-start rodando](evidencias/print-00-quickstart-rodando.png)
+
 ### Comando de instalação
 
 Dentro do container Quick Start:
@@ -187,6 +191,8 @@ A URL retorna HTTP 200, confirmando que a aplicação está servindo requisiçõ
 ![Deploy do react-starter — sucesso](evidencias/print-04-deploy-react-starter.png)
 
 ![Aplicação React rodando no browser](evidencias/print-07-react-app-rodando.png)
+
+![Componente react-starter no catálogo do Backstage/OpenChoreo](evidencias/print-08-componente-backstage.png)
 
 ---
 
