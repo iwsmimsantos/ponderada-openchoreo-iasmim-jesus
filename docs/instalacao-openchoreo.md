@@ -303,9 +303,9 @@ react-starter   default   deployment/web-application   24s
 
 ---
 
-## 6. Conclusão
+## 6. Análise crítica e conclusão
 
-### Resumo
+### Resumo dos resultados
 
 | Etapa | Status |
 |-------|--------|
@@ -316,16 +316,55 @@ react-starter   default   deployment/web-application   24s
 | URL da aplicação | `http://http-react-starter-development-default-cde5190f.openchoreoapis.localhost:19080` |
 | Recursos Kubernetes | Namespaces, ClusterDataPlane, Environments, Projects, ComponentTypes, Components — todos presentes |
 
-### O que foi alcançado
+---
 
-- Instalação completa do OpenChoreo v1.1.1 via Quick Start com todos os componentes em estado Ready
-- Interface Backstage acessível e autenticada
-- Aplicação `react-starter` publicada e servindo requisições (HTTP 200)
-- Recursos da plataforma (environments, projects, clustercomponenttypes) criados e visíveis via `kubectl`
-- Fluxo completo de publicação validado: criação de componente → workload → ReleaseBinding → Deployment → HTTPRoute
+### Por que a primeira tentativa falhou (Colima) e a segunda funcionou (Docker Desktop)
 
-### Observações técnicas
+A primeira tentativa utilizou o **Colima** como runtime Docker (via VM leve sobre o hypervisor do macOS). Nesse ambiente, o pod do **OpenBao** não atingiu o estado *Ready* dentro do timeout do readiness probe. O motivo mais provável é a diferença de como cada runtime lida com o I/O de disco e a alocação de memória da VM:
 
-- O `./install.sh` utiliza k3d para criar um cluster Kubernetes local dentro do Docker; as portas são mapeadas automaticamente (8080, 19080, etc.)
-- O runtime Docker Desktop 4.55.0 (Apple Silicon) processou toda a instalação sem problemas, diferente de tentativas anteriores com Colima onde o OpenBao apresentava timeout
-- Os componentes opcionais (Workflow Plane e Observability Plane) não foram instalados, pois a atividade não requer esses módulos
+- O Colima cria uma VM Linux separada com recursos fixos alocados na inicialização. Em situações de carga simultânea (vários pods subindo ao mesmo tempo), a latência de I/O dentro da VM pode atrasar inicializações que dependem de escrita em disco — como o OpenBao, que precisa inicializar seu armazenamento de segredos.
+- O **Docker Desktop** usa o mesmo mecanismo de VM (Apple Virtualization Framework), mas mantém uma integração mais direta com o macOS, especialmente no gerenciamento de memória compartilhada e acesso ao socket Docker. Isso reduz a latência de operações críticas durante a instalação.
+- A cadeia de falha observada na primeira tentativa foi direta: `OpenBao não Ready → Data Plane não iniciado → sem environments → ReleaseBinding sem destino → timeout no deploy`. Resolvendo a causa raiz (estabilidade do OpenBao), todas as etapas seguintes funcionaram.
+
+---
+
+### Requisitos de hardware e o que acontece com menos recursos
+
+O OpenChoreo v1.1.1 em modo Quick Start cria um cluster k3d com múltiplos pods rodando simultaneamente. Os requisitos mínimos declarados pelo script são 1 vCPU e 2 GB de RAM, mas na prática a instalação completa (Control Plane + Data Plane + OpenBao + Backstage) exige mais:
+
+| Componente | Impacto se recursos insuficientes |
+|------------|----------------------------------|
+| OpenBao | Pod não fica Ready — bloqueia a instalação (foi o erro da tentativa anterior) |
+| Backstage | Interface não sobe — impossibilita validação da seção 3 |
+| Data Plane (Cluster Agent + Gateway Proxy) | Sem data plane ativo, não há environments — deploy falha no ReleaseBinding |
+| kgateway | Sem gateway, as rotas HTTP não são criadas — aplicação não fica acessível |
+
+Em uma máquina com menos de 4 GB disponíveis para o Docker, o cenário esperado seria a falha em cascata a partir do OpenBao ou do Data Plane, exatamente o que foi observado com o Colima configurado com recursos mais restritos.
+
+---
+
+### Limitações observadas na plataforma
+
+Mesmo com a instalação bem-sucedida, ficaram visíveis algumas limitações do ambiente local:
+
+1. **URL gerada é não-determinística** — a URL da aplicação (`http://http-react-starter-development-default-cde5190f...`) contém um hash gerado automaticamente, o que dificulta documentar uma URL fixa para testes.
+2. **Dependência de DNS local** — os domínios `*.localhost` e `*.openchoreoapis.localhost` só funcionam na máquina onde o cluster está rodando. Em um ambiente compartilhado ou CI, seria necessário configurar DNS ou usar `nip.io`.
+3. **Componentes opcionais ausentes** — Workflow Plane e Observability Plane não foram instalados. Sem eles, não é possível usar pipelines de CI/CD ou monitoramento, que são funcionalidades centrais em um ambiente de produção.
+4. **Estado efêmero** — ao parar ou remover o container Quick Start, o cluster k3d e todos os recursos criados são destruídos. Não há persistência entre sessões sem configuração adicional.
+
+---
+
+### O que poderia ter sido feito de forma diferente
+
+1. **Aumentar os recursos do Colima antes de instalar** — configurar `colima start --cpu 6 --memory 8` antes de tentar a instalação poderia ter evitado o timeout do OpenBao na primeira tentativa.
+2. **Monitorar os pods individualmente** — em vez de aguardar o timeout do script, usar `kubectl get pods -A -w` para acompanhar em tempo real quais pods travaram e por quê permitiria diagnóstico mais rápido.
+3. **Instalar com módulos opcionais** — executar `./install.sh --version v1.1.1 --enable-observability` permitiria validar o monitoramento e os traces da aplicação, completando o cenário de uso real da plataforma.
+4. **Usar Gitpod ou ambiente cloud** — para máquinas com limitação real de hardware, o OpenChoreo oferece ambientes cloud que dispensam a instalação local, mantendo a experiência de uso da plataforma.
+
+---
+
+### Conclusão
+
+A atividade demonstrou que o OpenChoreo v1.1.1 é funcional em ambiente local macOS com Docker Desktop, desde que os recursos estejam disponíveis e o runtime Docker seja estável. O fluxo completo foi validado — da instalação ao acesso à aplicação publicada — e os recursos da plataforma (environments, projects, component types) refletem corretamente o estado esperado após um deploy bem-sucedido.
+
+A principal aprendizagem técnica foi entender a cadeia de dependências interna da plataforma: um único componente instável (OpenBao) é suficiente para bloquear toda a stack de publicação, porque ele é o responsável pelo gerenciamento de segredos que outros componentes consomem.
