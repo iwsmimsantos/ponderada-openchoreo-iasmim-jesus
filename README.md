@@ -34,13 +34,18 @@ Repositório da atividade de instalação e validação do [OpenChoreo](https://
 └── docs/
     ├── instalacao-openchoreo.md        # Documentação da atividade
     └── evidencias/
+        ├── print-00-quickstart-rodando.png
         ├── print-01-recursos-docker.png
         ├── print-02-instalacao-sucesso.png
         ├── print-03-check-status.png
         ├── print-04-deploy-react-starter.png
         ├── print-05-kubectl-recursos.png
         ├── print-06-interface-openchoreo.png
-        └── print-07-react-app-rodando.png
+        ├── print-07-react-app-rodando.png
+        ├── print-08-componente-backstage.png
+        ├── print-f01-instalacao-erro-openbao.png  # 1ª tentativa: erro OpenBao
+        ├── print-f02-check-status-pendente.png    # 1ª tentativa: componentes PENDING
+        └── print-f03-deploy-timeout.png           # 1ª tentativa: timeout ReleaseBinding
 ```
 
 ## Resumo dos resultados
