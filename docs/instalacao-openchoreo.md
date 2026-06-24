@@ -318,6 +318,51 @@ react-starter   default   deployment/web-application   24s
 
 ---
 
+### Primeira tentativa — falha com Colima
+
+A primeira tentativa de instalação utilizou o **Colima** como runtime Docker. A instalação falhou com `exit code 1` ainda durante a fase de inicialização do OpenBao.
+
+**Evidência 1 — erro na instalação (OpenBao não ficou Ready):**
+
+![Instalação com erro — OpenBao pod failed to become ready](evidencias/print-f01-instalacao-erro-openbao.png)
+
+O script de instalação aguardou o pod do OpenBao atingir o estado *Ready*, mas ele esgotou o timeout com a mensagem:
+
+```
+[ERROR] OpenBao pod failed to become ready
+[ERROR] Installation failed unexpectedly (exit code 1)
+[ERROR] Re-run with --debug for more details
+```
+
+**Evidência 2 — status pós-falha (componentes PENDING e NOT STARTED):**
+
+![check-status mostrando OpenBao PENDING e Data Plane NOT STARTED](evidencias/print-f02-check-status-pendente.png)
+
+O `./check-status.sh` executado após a falha mostrou que apenas parte da infraestrutura subiu:
+
+```
+| OpenBao        [PENDING]     |
+| Backstage      [PENDING]     |
+| Cluster Agent  [NOT STARTED] |
+| Gateway Proxy  [NOT STARTED] |
+```
+
+O Data Plane inteiro ficou sem inicializar porque depende do OpenBao para buscar segredos via ClusterSecretStore.
+
+**Evidência 3 — timeout no deploy (consequência direta):**
+
+![Deploy timeout — Timeout waiting for ReleaseBinding to sync (300s)](evidencias/print-f03-deploy-timeout.png)
+
+Mesmo assim, foi tentado o `./deploy-react-starter.sh`, que falhou com:
+
+```
+[ERROR] Timeout waiting for ReleaseBinding to sync (300s)
+```
+
+Sem environments disponíveis (pois o Data Plane não subiu), o ReleaseBinding não teve destino para sincronizar.
+
+---
+
 ### Por que a primeira tentativa falhou (Colima) e a segunda funcionou (Docker Desktop)
 
 A primeira tentativa utilizou o **Colima** como runtime Docker (via VM leve sobre o hypervisor do macOS). Nesse ambiente, o pod do **OpenBao** não atingiu o estado *Ready* dentro do timeout do readiness probe. O motivo mais provável é a diferença de como cada runtime lida com o I/O de disco e a alocação de memória da VM:
